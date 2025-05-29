@@ -1,9 +1,16 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-CELL_SIZE = 32
-UNITS_X = 18
-UNITS_Y = 18
+CELL_SIZE = 22
+BASE_UNITS_X = 16
+BASE_UNITS_Y = 10
+MAX_UNITS_X = 30
+MAX_UNITS_Y = 20
+MAX_CANVAS_WIDTH = 600
+MAX_CANVAS_HEIGHT = 400
+
+UNITS_X = BASE_UNITS_X
+UNITS_Y = BASE_UNITS_Y
 
 CANVAS_WIDTH = CELL_SIZE * UNITS_X
 CANVAS_HEIGHT = CELL_SIZE * UNITS_Y
@@ -32,16 +39,47 @@ CELL_NUMBER_AXIS_COLOR = "#495057"
 
 FONT_FAMILY_PRIMARY = "Segoe UI"
 FONT_FAMILY_FALLBACK = "Calibri"
-FONT_SIZE_NORMAL = 11
-FONT_SIZE_LABEL_FRAME = 12
-FONT_SIZE_GRID_LABEL = 9
-FONT_SIZE_CELL_NUMBER = 7
+FONT_SIZE_NORMAL = 9
+FONT_SIZE_LABEL_FRAME = 10
+FONT_SIZE_GRID_LABEL = 7
+FONT_SIZE_CELL_NUMBER = 5
 
 
 class DDAGraphicalTest:
     def __init__(self, master):
         self.master = master
+        self.current_units_x = BASE_UNITS_X
+        self.current_units_y = BASE_UNITS_Y
+        self.scroll_x = None
+        self.scroll_y = None
+        self._update_grid_dimensions()
         self._initialize_application()
+
+    def _update_grid_dimensions(self):
+        global UNITS_X, UNITS_Y, CANVAS_WIDTH, CANVAS_HEIGHT
+        global WORLD_X_MIN, WORLD_Y_MIN, WORLD_X_MAX_EDGE, WORLD_Y_MAX_EDGE
+        
+        UNITS_X = self.current_units_x
+        UNITS_Y = self.current_units_y
+        CANVAS_WIDTH = CELL_SIZE * UNITS_X
+        CANVAS_HEIGHT = CELL_SIZE * UNITS_Y
+        WORLD_X_MIN = -UNITS_X // 2
+        WORLD_Y_MIN = -UNITS_Y // 2
+        WORLD_X_MAX_EDGE = WORLD_X_MIN + UNITS_X
+        WORLD_Y_MAX_EDGE = WORLD_Y_MIN + UNITS_Y
+
+    def _calculate_required_grid_size(self, x0, y0, x1, y1):
+        coords = [x0, y0, x1, y1]
+        max_coord = max(abs(coord) for coord in coords)
+        
+        padding = 3
+        required_size = (max_coord + padding) * 2
+        
+        min_size_x = max(BASE_UNITS_X, required_size)
+        min_size_y = max(BASE_UNITS_Y, required_size)
+        
+        self.current_units_x = min(MAX_UNITS_X, min_size_x if min_size_x % 2 == 0 else min_size_x + 1)
+        self.current_units_y = min(MAX_UNITS_Y, min_size_y if min_size_y % 2 == 0 else min_size_y + 1)
 
     def _initialize_application(self):
         self._setup_window()
@@ -107,16 +145,16 @@ class DDAGraphicalTest:
 
     def _create_header(self):
         header_frame = ttk.Frame(self.master, style='TFrame')
-        header_frame.pack(pady=(15, 5), padx=20, fill="x")
+        header_frame.pack(pady=(10, 3), padx=15, fill="x")
         
         title_label = ttk.Label(header_frame, text="Algoritmo DDA - Rasterização de Linha",
-                               style='Outer.TLabel', font=(FONT_FAMILY_PRIMARY, 14, "bold"))
+                               style='Outer.TLabel', font=(FONT_FAMILY_PRIMARY, 12, "bold"))
         title_label.pack()
 
     def _create_input_section(self):
         input_labelframe = ttk.LabelFrame(self.master, text="🎯 Coordenadas da Linha", 
-                                         padding=(25, 20), style='TLabelframe')
-        input_labelframe.pack(pady=15, padx=20, fill="x")
+                                         padding=(15, 10), style='TLabelframe')
+        input_labelframe.pack(pady=8, padx=15, fill="x")
 
         self._setup_grid_weights(input_labelframe)
         self._create_coordinate_inputs(input_labelframe)
@@ -127,24 +165,24 @@ class DDAGraphicalTest:
 
     def _create_coordinate_inputs(self, parent):
         coordinates = [
-            ("Ponto Inicial X:", "x0_entry", "-5", 0, 0),
-            ("Ponto Inicial Y:", "y0_entry", "-4", 0, 2),
-            ("Ponto Final X:", "x1_entry", "5", 1, 0),
-            ("Ponto Final Y:", "y1_entry", "4", 1, 2)
+            ("Ponto Inicial X:", "x0_entry", "-3", 0, 0),
+            ("Ponto Inicial Y:", "y0_entry", "-2", 0, 2),
+            ("Ponto Final X:", "x1_entry", "3", 1, 0),
+            ("Ponto Final Y:", "y1_entry", "2", 1, 2)
         ]
 
         for label_text, attr_name, default_value, row, col in coordinates:
             ttk.Label(parent, text=label_text, style='Input.TLabel').grid(
-                row=row, column=col, padx=(20 if col==2 else 0, 8), pady=10, sticky="w")
+                row=row, column=col, padx=(12 if col==2 else 0, 5), pady=6, sticky="w")
             
-            entry = ttk.Entry(parent, width=10)
-            entry.grid(row=row, column=col+1, pady=10, sticky="ew")
+            entry = ttk.Entry(parent, width=6)
+            entry.grid(row=row, column=col+1, pady=6, sticky="ew")
             entry.insert(0, default_value)
             setattr(self, attr_name, entry)
 
     def _create_action_button(self):
         button_frame = ttk.Frame(self.master, style='TFrame')
-        button_frame.pack(pady=10, padx=20, fill="x")
+        button_frame.pack(pady=6, padx=15, fill="x")
         
         self.draw_button = ttk.Button(button_frame, text="🎨 Executar Algoritmo DDA", 
                                      command=self._execute_dda_algorithm)
@@ -152,31 +190,75 @@ class DDAGraphicalTest:
 
     def _create_visualization_area(self):
         viz_frame = ttk.Frame(self.master, style='TFrame')
-        viz_frame.pack(pady=(10, 5), padx=20, fill="both", expand=True)
+        viz_frame.pack(pady=(6, 3), padx=15, fill="both", expand=True)
         
         viz_label = ttk.Label(viz_frame, text="📊 Visualização da Grade", 
                              style='Outer.TLabel', font=self.labelframe_font)
-        viz_label.pack(pady=(0, 10))
+        viz_label.pack(pady=(0, 6))
 
-        self.canvas_outer_frame = ttk.Frame(viz_frame, style='CanvasOuter.TFrame', padding=15)
+        self.canvas_outer_frame = ttk.Frame(viz_frame, style='CanvasOuter.TFrame', padding=8)
         self.canvas_outer_frame.pack(fill="both", expand=True)
 
         self._create_canvas_widget()
 
     def _create_canvas_widget(self):
-        self.canvas = tk.Canvas(self.canvas_outer_frame, width=CANVAS_WIDTH, height=CANVAS_HEIGHT,
+        canvas_frame = ttk.Frame(self.canvas_outer_frame)
+        canvas_frame.pack(fill="both", expand=True)
+        
+        actual_width = min(CANVAS_WIDTH, MAX_CANVAS_WIDTH)
+        actual_height = min(CANVAS_HEIGHT, MAX_CANVAS_HEIGHT)
+        
+        self.canvas = tk.Canvas(canvas_frame, width=actual_width, height=actual_height,
                                bg=CANVAS_BG_COLOR, highlightthickness=2, 
-                               highlightbackground=AXIS_COLOR, relief="solid")
-        self.canvas.pack(anchor="center")
+                               highlightbackground=AXIS_COLOR, relief="solid",
+                               scrollregion=(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT))
+        
+        if CANVAS_WIDTH > MAX_CANVAS_WIDTH:
+            self.scroll_x = ttk.Scrollbar(canvas_frame, orient="horizontal", command=self.canvas.xview)
+            self.canvas.configure(xscrollcommand=self.scroll_x.set)
+            self.scroll_x.pack(side="bottom", fill="x")
+        
+        if CANVAS_HEIGHT > MAX_CANVAS_HEIGHT:
+            self.scroll_y = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+            self.canvas.configure(yscrollcommand=self.scroll_y.set)
+            self.scroll_y.pack(side="right", fill="y")
+        
+        self.canvas.pack(side="left", fill="both", expand=True)
+
+    def _update_canvas_size(self):
+        actual_width = min(CANVAS_WIDTH, MAX_CANVAS_WIDTH)
+        actual_height = min(CANVAS_HEIGHT, MAX_CANVAS_HEIGHT)
+        
+        self.canvas.configure(width=actual_width, height=actual_height,
+                             scrollregion=(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT))
+        
+        if hasattr(self, 'scroll_x') and self.scroll_x:
+            self.scroll_x.destroy()
+            self.scroll_x = None
+        if hasattr(self, 'scroll_y') and self.scroll_y:
+            self.scroll_y.destroy()
+            self.scroll_y = None
+        
+        canvas_frame = self.canvas.master
+        
+        if CANVAS_WIDTH > MAX_CANVAS_WIDTH:
+            self.scroll_x = ttk.Scrollbar(canvas_frame, orient="horizontal", command=self.canvas.xview)
+            self.canvas.configure(xscrollcommand=self.scroll_x.set)
+            self.scroll_x.pack(side="bottom", fill="x")
+        
+        if CANVAS_HEIGHT > MAX_CANVAS_HEIGHT:
+            self.scroll_y = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
+            self.canvas.configure(yscrollcommand=self.scroll_y.set)
+            self.scroll_y.pack(side="right", fill="y")
 
     def _create_information_footer(self):
         info_text = (f"💡 Grade: [{WORLD_X_MIN},{WORLD_X_MAX_EDGE-1}] × [{WORLD_Y_MIN},{WORLD_Y_MAX_EDGE-1}] "
                     f"| 🔵 Pixels DDA | 🔴 Linha Ideal")
         
         self.info_label = ttk.Label(self.master, style='Outer.TLabel', text=info_text,
-                                   font=(self.primary_font[0], FONT_SIZE_NORMAL-1),
+                                   font=(self.primary_font[0], FONT_SIZE_NORMAL-2),
                                    justify="center")
-        self.info_label.pack(pady=(5, 20), padx=20)
+        self.info_label.pack(pady=(3, 10), padx=15)
 
     def _world_to_canvas_cell_coords(self, wx, wy):
         cx0 = (wx - WORLD_X_MIN) * CELL_SIZE
@@ -294,11 +376,34 @@ class DDAGraphicalTest:
         if coordinates is None:
             return
 
-        self._clear_previous_results()
         x0, y0, x1, y1 = coordinates
         
+        max_coord = max(abs(coord) for coord in coordinates)
+        if max_coord > 15:
+            response = messagebox.askyesno("Grade Grande", 
+                                         f"As coordenadas são grandes (máximo: {max_coord}). "
+                                         f"Isso criará uma grade maior com barras de rolagem. Continuar?", 
+                                         parent=self.master)
+            if not response:
+                return
+        
+        old_units_x, old_units_y = self.current_units_x, self.current_units_y
+        self._calculate_required_grid_size(x0, y0, x1, y1)
+        
+        if (self.current_units_x != old_units_x or self.current_units_y != old_units_y):
+            self._update_grid_dimensions()
+            self._update_canvas_size()
+            self._update_info_footer()
+            self._draw_initial_grid()
+        
+        self._clear_previous_results()
         dda_pixels = self.dda_algorithm(x0, y0, x1, y1)
         self._visualize_results(dda_pixels, x0, y0, x1, y1)
+
+    def _update_info_footer(self):
+        info_text = (f"💡 Grade: [{WORLD_X_MIN},{WORLD_X_MAX_EDGE-1}] × [{WORLD_Y_MIN},{WORLD_Y_MAX_EDGE-1}] "
+                    f"| 🔵 Pixels DDA | 🔴 Linha Ideal")
+        self.info_label.configure(text=info_text)
 
     def _get_input_coordinates(self):
         try:
